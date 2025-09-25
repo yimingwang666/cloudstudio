@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="login-overlay" class="visible">
+        <div class="login-box">
+            <h2>Cloud Studio</h2>
+            <p>输入用户名以同步您的进度</p>
+            <form id="login-form">
+                <input type="text" id="username-input" placeholder="输入您的用户名" required>
+                <button type="submit">进入</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="app-container">
+        <header class="player-bar">
+            <div class="player-controls">
+                <button id="prev-btn" title="上一首"><i class="fas fa-step-backward"></i></button>
+                <button id="rewind-btn" title="后退10秒"><i class="fas fa-backward"></i></button>
+                <button id="play-pause-btn" title="播放/暂停"><i class="fas fa-play"></i></button>
+                <button id="forward-btn" title="前进10秒"><i class="fas fa-forward"></i></button>
+                <button id="next-btn" title="下一首"><i class="fas fa-step-forward"></i></button>
+            </div>
+            <div class="progress-container">
+                <span id="current-time">00:00</span>
+                <input type="range" id="progress-bar" value="0" step="1">
+                <span id="duration">00:00</span>
+            </div>
+            <div class="now-playing-title">
+                <i class="fas fa-music"></i>
+                <span id="current-track-title">未选择音频</span>
+            </div>
+            <div class="volume-container">
+                <i class="fas fa-volume-up"></i>
+                <input type="range" id="volume-bar" min="0" max="1" step="0.01" value="1">
+            </div>
+            <div class="user-display">
+                <i class="fas fa-user"></i>
+                <span id="username-display"></span>
+                <button id="logout-btn" title="登出"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <aside class="sidebar">
+                <button class="sidebar-toggle-btn" id="sidebar-toggle"><i class="fas fa-chevron-left"></i></button>
+                <div class="list-container">
+                    <h3><i class="fas fa-headphones"></i> 音频列表</h3>
+                    <ul id="audio-list"></ul>
+                </div>
+                <div class="list-container">
+                    <h3><i class="fas fa-file-alt"></i> 文稿列表</h3>
+                    <ul id="text-list"></ul>
+                </div>
+            </aside>
+            <section id="content-viewer">
+                <div id="markdown-content" class="markdown-body">
+                    <h1>欢迎使用 Cloud Studio</h1>
+                    <p>请从左侧面板选择音频和文稿开始使用。</p>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <audio id="audio-player"></audio>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
