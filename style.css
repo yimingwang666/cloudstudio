@@ -19,7 +19,6 @@ body.light-theme {
   --glass: rgba(0, 0, 0, 0.02);
   --shadow: 0 6px 14px rgba(9, 30, 66, 0.06);
 }
-/* ... (基础样式保持不变) ... */
 * {
   box-sizing: border-box;
 }
@@ -43,14 +42,11 @@ body {
   white-space: nowrap;
   border: 0;
 }
-
-/* --- 登录闪烁修复 --- */
-/* 默认隐藏主应用，JS验证登录后会移除这个class */
 .app.loading {
   visibility: hidden;
 }
 
-/* ... (登录卡片样式保持不变) ... */
+/* ... (登录部分不变) ... */
 .overlay {
   position: fixed;
   inset: 0;
@@ -125,7 +121,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-/* app layout */
+/* ... (App & Topbar 部分不变) ... */
 .app {
   display: flex;
   flex-direction: column;
@@ -150,8 +146,6 @@ body {
   align-items: center;
   gap: 12px;
 }
-
-/* controls */
 .topbar button {
   background: transparent;
   border: 0;
@@ -192,7 +186,7 @@ body {
   text-overflow: ellipsis;
 }
 
-/* --- MAIN & SIDEBAR 布局修复 --- */
+/* --- 🐞 侧边栏布局终极修复 --- */
 .main {
   flex: 1;
   display: flex;
@@ -202,27 +196,28 @@ body {
   width: 300px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
   border-right: 1px solid rgba(255, 255, 255, 0.02);
-  display: flex; /* 关键 */
-  flex-direction: column; /* 关键 */
+  display: flex;
+  flex-direction: column;
   flex-shrink: 0;
   transition: margin-left 0.3s ease;
 }
 .sidebar.collapsed {
   margin-left: -300px;
 }
+
 .section {
-  flex: 1; /* 关键：让两个 section 平分空间 */
-  display: flex; /* 关键 */
-  flex-direction: column; /* 关键 */
-  min-height: 0; /* 关键：允许 flex item 收缩 */
-  margin-bottom: 0;
+  flex: 1; /* 平分空间 */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .section:first-child {
   border-bottom: 1px solid rgba(255, 255, 255, 0.02);
 }
+
 .section h3 {
-  padding: 18px; /* 将 padding 移到 h3 */
-  flex-shrink: 0; /* 关键：标题不收缩 */
+  padding: 18px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -230,23 +225,33 @@ body {
   color: var(--muted);
   font-size: 14px;
 }
+
+/* 滚动容器样式 */
+.list-container {
+  flex-grow: 1; /* 关键：让这个容器填满 section 里的剩余空间 */
+  overflow-y: auto; /* 关键：让这个容器负责滚动 */
+  padding: 0 10px 10px; /* 内边距 */
+}
+
+/* 列表样式 */
 .item-list {
-  overflow-y: auto; /* 关键：只有列表内容滚动 */
   list-style: none;
-  padding: 0 10px 10px;
+  padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+
 .item-list li {
-  padding: 10px 12px;
+  padding: 12px 15px;
   border-radius: 10px;
   cursor: pointer;
   border: 1px solid transparent;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.5;
+  transition: background-color 0.2s ease;
 }
 .item-list li:hover {
   background: var(--glass);
@@ -277,8 +282,6 @@ body {
   line-height: 1.8;
   color: var(--muted);
 }
-
-/* responsive */
 @media (max-width: 900px) {
   .sidebar {
     width: 260px;

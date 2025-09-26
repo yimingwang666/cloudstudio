@@ -4,7 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Cloud Studio</title>
-    <!-- ... (字体和图标链接不变) ... -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -18,9 +17,7 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <!-- 登录遮罩 -->
     <div id="login-overlay" class="overlay" role="dialog" aria-modal="true">
-      <!-- ... (登录卡片内容不变) ... -->
       <div class="login-card">
         <div class="brand">
           <i class="fas fa-cloud fa-2x"></i>
@@ -39,19 +36,16 @@
             autofocus
           />
           <div class="row">
-            <button type="submit" class="btn primary">进入工作室</button>
-            <button type="button" id="guest-btn" class="btn subtle">
+            <button type="submit" class="btn primary">进入工作室</button
+            ><button type="button" id="guest-btn" class="btn subtle">
               访客进入
             </button>
           </div>
         </form>
       </div>
     </div>
-
-    <!-- 主应用 (添加 loading class) -->
     <div id="app" class="app loading" aria-hidden="true">
       <header class="topbar">
-        <!-- ... (顶部栏内容不变) ... -->
         <div class="left">
           <button id="sidebar-toggle" title="折叠侧栏">
             <i class="fas fa-chevron-left"></i>
@@ -63,32 +57,27 @@
         <div class="center">
           <div class="progress-controls">
             <button id="prev-btn" title="上一首">
-              <i class="fas fa-step-backward"></i>
-            </button>
-            <button id="rewind-btn" title="后退10秒">
-              <i class="fas fa-backward"></i>
-            </button>
-            <button id="play-pause-btn" title="播放/暂停">
-              <i class="fas fa-play"></i>
-            </button>
-            <button id="forward-btn" title="前进10秒">
-              <i class="fas fa-forward"></i>
-            </button>
-            <button id="next-btn" title="下一首">
+              <i class="fas fa-step-backward"></i></button
+            ><button id="rewind-btn" title="后退10秒">
+              <i class="fas fa-backward"></i></button
+            ><button id="play-pause-btn" title="播放/暂停">
+              <i class="fas fa-play"></i></button
+            ><button id="forward-btn" title="前进10秒">
+              <i class="fas fa-forward"></i></button
+            ><button id="next-btn" title="下一首">
               <i class="fas fa-step-forward"></i>
             </button>
           </div>
           <div class="seek">
-            <span id="current-time">00:00</span>
-            <input
+            <span id="current-time">00:00</span
+            ><input
               id="progress-bar"
               type="range"
               min="0"
               step="1"
               value="0"
               aria-label="进度条"
-            />
-            <span id="duration">00:00</span>
+            /><span id="duration">00:00</span>
           </div>
           <div class="now-playing" id="current-track-title" aria-live="polite">
             未选择音频
@@ -96,8 +85,8 @@
         </div>
         <div class="right">
           <div class="volume">
-            <i class="fas fa-volume-up"></i>
-            <input
+            <i class="fas fa-volume-up"></i
+            ><input
               id="volume-bar"
               type="range"
               min="0"
@@ -111,26 +100,27 @@
             <i class="fas fa-moon"></i>
           </button>
           <div class="user">
-            <i class="fas fa-user-circle"></i>
-            <span id="username-display"></span>
+            <i class="fas fa-user-circle"></i
+            ><span id="username-display"></span>
           </div>
           <button id="logout-btn" title="注销">登出</button>
         </div>
       </header>
-
       <main class="main">
         <aside class="sidebar" id="sidebar">
-          <!-- ** 结构调整以修复布局 ** -->
           <div class="section">
             <h3><i class="fas fa-headphones"></i> 音频</h3>
-            <ul id="audio-list" class="item-list" role="list"></ul>
+            <div class="list-container">
+              <ul id="audio-list" class="item-list" role="list"></ul>
+            </div>
           </div>
           <div class="section">
             <h3><i class="fas fa-file-lines"></i> 文稿</h3>
-            <ul id="text-list" class="item-list" role="list"></ul>
+            <div class="list-container">
+              <ul id="text-list" class="item-list" role="list"></ul>
+            </div>
           </div>
         </aside>
-
         <section
           class="viewer"
           id="content-viewer"
@@ -146,9 +136,7 @@
         </section>
       </main>
     </div>
-
     <audio id="audio-player" crossorigin="anonymous"></audio>
-
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="script.js" defer></script>
   </body>
