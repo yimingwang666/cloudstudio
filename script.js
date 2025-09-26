@@ -60,7 +60,7 @@ const AUDIO_FILES = [
 const TEXT_FILES = ["覺燈日光(一).md", "覺燈日光(二).md", "覺燈日光(三).md"]; // <-- 放 assets 里
 // ----------------------------------------
 
-/* 全局元素 */
+// ---------- 全局元素 ----------
 const loginOverlay = document.getElementById("login-overlay");
 const loginForm = document.getElementById("login-form");
 const usernameInput = document.getElementById("username-input");
@@ -87,7 +87,7 @@ const currentTrackTitle = document.getElementById("current-track-title");
 const sidebar = document.getElementById("sidebar");
 const sidebarToggle = document.getElementById("sidebar-toggle");
 
-/* 应用状态 (代码不变) */
+// ---------- 应用状态 ----------
 let appState = {
   currentUser: null,
   lastTheme: "dark",
@@ -99,12 +99,12 @@ let appState = {
   sidebarCollapsed: false,
 };
 
-/* 防抖和节流句柄 (代码不变) */
+// 防抖与节流句柄
 let saveTimeout = null,
   scrollTimeout = null,
   progressSaveThrottle = null;
 
-/* ----------------- 辅助函数 (代码不变) ----------------- */
+// ----------------- 辅助函数 -----------------
 function sanitizeForSave(state) {
   return {
     lastTheme: state.lastTheme,
@@ -170,7 +170,7 @@ function formatTime(seconds = 0) {
   return `${m}:${s}`;
 }
 
-/* ----------------- 渲染与交互 (代码不变) ----------------- */
+// ----------------- 渲染与交互 -----------------
 function renderLists() {
   audioListEl.innerHTML = AUDIO_FILES.map(
     (f) => `<li tabindex="0" class="audio-item" data-src="${f}">${f}</li>`
@@ -296,7 +296,8 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
-/* ----------------- 🐞 核心逻辑终极修复区 🐞 ----------------- */
+// ----------------- 核心播放逻辑 -----------------
+let durationCheckInterval = null;
 
 function loadAudio(fileName, shouldPlay = true) {
   appState.lastPlayedAudio = fileName;
@@ -429,13 +430,15 @@ contentViewer.addEventListener("scroll", () => {
   }, 300);
 });
 
-/* ----------------- 登录/注销/初始化 (已优化) ----------------- */
+// ----------------- 登录/注销/初始化（修复版） -----------------
 async function doLogin(name) {
   appState.currentUser = name;
   usernameDisplay.textContent = name;
   const savedState = await loadStateFromBackend(name);
-  // Memory Fix: Properly merge saved state
-  Object.assign(appState, savedState);
+  // 仅在后端有返回时合并，防止把 undefined 覆盖掉
+  if (savedState && typeof savedState === "object") {
+    Object.assign(appState, savedState);
+  }
 
   // Apply UI based on loaded state
   applyTheme(appState.lastTheme || "dark", false);
@@ -445,7 +448,7 @@ async function doLogin(name) {
   if (appState.sidebarCollapsed) sidebar.classList.add("collapsed");
 
   renderLists(); // This will also call refreshActiveMarks
-  // Memory Fix: Explicitly restore last opened items
+  // Explicitly restore last opened items
   if (appState.lastOpenedText && TEXT_FILES.includes(appState.lastOpenedText)) {
     loadAndRenderMarkdown(appState.lastOpenedText);
   }
@@ -456,39 +459,61 @@ async function doLogin(name) {
     loadAudio(appState.lastPlayedAudio, false);
   }
 
-  // UI transition
+  // UI transition: 隐藏登录界面并确保主界面可见
   loginOverlay.classList.remove("visible");
-  appEl.classList.remove("loading"); // Login Flash Fix
+  loginOverlay.style.display = "none";
+  appEl.classList.remove("loading");
   appEl.setAttribute("aria-hidden", "false");
+
   localStorage.setItem("studio_currentUser", name);
   scheduleStateSave();
 }
+
+function doLogoutUIOnly() {
+  // 不强制保存（调用者可在需要时先调用 save），然后重置 UI 到登录态
+  appState.currentUser = null;
+  loginOverlay.classList.add("visible");
+  loginOverlay.style.display = "flex";
+  appEl.classList.add("loading");
+  appEl.setAttribute("aria-hidden", "true");
+  usernameDisplay.textContent = "";
+}
+
+// 绑定 logout：先尝试保存，再重置 UI（与你的原逻辑兼容）
 logoutBtn.addEventListener("click", async () => {
   await saveStateToBackend();
   localStorage.removeItem("studio_currentUser");
-  window.location.reload();
+  // 刷新页面也可以，但为了更流畅我们直接切回登录视图
+  doLogoutUIOnly();
 });
+
+// 确保只有一个登录 submit 监听（避免重复）
 loginForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const name = (usernameInput.value || "").trim();
   if (name) doLogin(name);
 });
+
+// 访客按钮
 guestBtn.addEventListener("click", () =>
   doLogin(`guest_${Date.now().toString().slice(-6)}`)
 );
 
+// ----------------- init（只在这里处理一次初始化） -----------------
 function init() {
   const savedTheme = localStorage.getItem("studio_lastTheme");
   if (savedTheme) applyTheme(savedTheme, false);
 
   const savedUser = localStorage.getItem("studio_currentUser");
   if (savedUser) {
-    // Has user, proceed to login (removes flash)
+    // 如果有已登录用户，直接恢复并隐藏登录界面（避免闪烁）
     doLogin(savedUser);
   } else {
-    // No user, show login form
+    // 否则显示登录界面
     loginOverlay.classList.add("visible");
-    appEl.classList.remove("loading"); // Also remove loading for login view
+    loginOverlay.style.display = "flex";
+    appEl.classList.remove("loading"); // 使顶部/主界面元素渲染（但会被 overlay 遮盖）
+    appEl.setAttribute("aria-hidden", "true");
   }
 }
 
