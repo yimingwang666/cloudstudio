@@ -1,90 +1,103 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Studio</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cloud Studio</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <div id="login-overlay" class="visible">
-        <div class="login-box">
-            <i class="fas fa-cloud login-icon"></i>
-            <h2>Cloud Studio</h2>
-            <p>输入用户名以同步您的学习进度</p>
-            <form id="login-form">
-                <input type="text" id="username-input" placeholder="输入您的用户名" required autocomplete="username">
-                <button type="submit">进入工作室</button>
-            </form>
+  <!-- 登录遮罩 -->
+  <div id="login-overlay" class="overlay visible" role="dialog" aria-modal="true">
+    <div class="login-card">
+      <div class="brand">
+        <i class="fas fa-cloud fa-2x"></i>
+        <h1>Cloud Studio</h1>
+      </div>
+      <p class="hint">输入用户名来同步并恢复您的音频/文稿位置（支持特殊字符）</p>
+      <form id="login-form" autocomplete="off">
+        <label for="username-input" class="sr-only">用户名</label>
+        <input id="username-input" name="username" placeholder="例如：zhangsan 或 user@example.com" required autofocus>
+        <div class="row">
+          <button type="submit" class="btn primary">进入工作室</button>
+          <button type="button" id="guest-btn" class="btn subtle">访客进入</button>
         </div>
+      </form>
     </div>
+  </div>
 
-    <div id="app-container">
-        <header class="player-bar">
-            <div class="player-controls">
-                <button id="prev-btn" title="上一首"><i class="fas fa-step-backward"></i></button>
-                <button id="rewind-btn" title="后退10秒"><i class="fas fa-backward"></i></button>
-                <button id="play-pause-btn" title="播放/暂停"><i class="fas fa-play"></i></button>
-                <button id="forward-btn" title="前进10秒"><i class="fas fa-forward"></i></button>
-                <button id="next-btn" title="下一首"><i class="fas fa-step-forward"></i></button>
-            </div>
-            <div class="progress-container">
-                <span id="current-time" class="time-display">00:00</span>
-                <input type="range" id="progress-bar" value="0" step="1">
-                <span id="duration" class="time-display">00:00</span>
-            </div>
-            <div class="now-playing-title">
-                <i class="fas fa-music"></i>
-                <span id="current-track-title">未选择音频</span>
-            </div>
-            <div class="volume-container">
-                <i class="fas fa-volume-up"></i>
-                <input type="range" id="volume-bar" min="0" max="1" step="0.01" value="1">
-            </div>
-            <div class="user-controls">
-                <button id="theme-toggle-btn" title="切换主题"><i class="fas fa-moon"></i></button>
-                <div class="user-display">
-                    <i class="fas fa-user"></i>
-                    <span id="username-display"></span>
-                </div>
-                <button id="logout-btn" title="登出"><i class="fas fa-sign-out-alt"></i></button>
-            </div>
-        </header>
+  <!-- 主应用 -->
+  <div id="app" class="app" aria-hidden="true">
+    <header class="topbar">
+      <div class="left">
+        <button id="sidebar-toggle" title="折叠侧栏"><i class="fas fa-chevron-left"></i></button>
+        <div class="brand small"><i class="fas fa-studio"></i><span>Cloud Studio</span></div>
+      </div>
 
-        <main class="main-content">
-            <aside class="sidebar">
-                <button class="sidebar-toggle-btn" id="sidebar-toggle"><i class="fas fa-chevron-left"></i></button>
-                <div class="list-section">
-                    <h3 class="list-header"><i class="fas fa-headphones"></i> 音频列表</h3>
-                    <div class="list-content">
-                        <ul id="audio-list"></ul>
-                    </div>
-                </div>
-                <div class="list-section">
-                    <h3 class="list-header"><i class="fas fa-file-alt"></i> 文稿列表</h3>
-                    <div class="list-content">
-                        <ul id="text-list"></ul>
-                    </div>
-                </div>
-            </aside>
-            <section id="content-viewer">
-                <div id="markdown-content" class="markdown-body">
-                    <div class="welcome-message">
-                        <h1>欢迎使用 Cloud Studio</h1>
-                        <p>请从左侧面板选择音频和文稿开始使用。</p>
-                    </div>
-                </div>
-            </section>
-        </main>
-    </div>
-    
-    <audio id="audio-player"></audio>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="script.js"></script>
+      <div class="center">
+        <div class="progress-controls">
+          <button id="prev-btn" title="上一首"><i class="fas fa-step-backward"></i></button>
+          <button id="rewind-btn" title="后退10秒"><i class="fas fa-backward"></i></button>
+          <button id="play-pause-btn" title="播放/暂停"><i class="fas fa-play"></i></button>
+          <button id="forward-btn" title="前进10秒"><i class="fas fa-forward"></i></button>
+          <button id="next-btn" title="下一首"><i class="fas fa-step-forward"></i></button>
+        </div>
+
+        <div class="seek">
+          <span id="current-time">00:00</span>
+          <input id="progress-bar" type="range" min="0" step="1" value="0" aria-label="进度条">
+          <span id="duration">00:00</span>
+        </div>
+
+        <div class="now-playing" id="current-track-title" aria-live="polite">未选择音频</div>
+      </div>
+
+      <div class="right">
+        <div class="volume">
+          <i class="fas fa-volume-up"></i>
+          <input id="volume-bar" type="range" min="0" max="1" step="0.01" value="1" aria-label="音量">
+        </div>
+
+        <button id="theme-toggle-btn" title="切换主题"><i class="fas fa-moon"></i></button>
+
+        <div class="user">
+          <i class="fas fa-user-circle"></i>
+          <span id="username-display"></span>
+        </div>
+        <button id="logout-btn" title="注销">登出</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <aside class="sidebar" id="sidebar">
+        <div class="section">
+          <h3><i class="fas fa-headphones"></i> 音频</h3>
+          <ul id="audio-list" class="item-list" role="list"></ul>
+        </div>
+        <div class="section">
+          <h3><i class="fas fa-file-lines"></i> 文稿</h3>
+          <ul id="text-list" class="item-list" role="list"></ul>
+        </div>
+      </aside>
+
+      <section class="viewer" id="content-viewer" tabindex="0" aria-label="内容查看">
+        <div id="markdown-content" class="markdown-body">
+          <h2>欢迎</h2>
+          <p>请从左侧选择音频或文稿开始。系统会为每个用户名记忆播放进度与阅读位置。</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <audio id="audio-player" crossorigin="anonymous"></audio>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="script.js" defer></script>
 </body>
 </html>
