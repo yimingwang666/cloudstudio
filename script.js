@@ -311,32 +311,52 @@ function loadAudio(fileName, shouldPlay = true) {
   scheduleStateSave(400);
 }
 
+// 当音频元数据（包括总时长）加载完成时触发
 audioPlayer.addEventListener("loadedmetadata", () => {
-  if (!isFinite(audioPlayer.duration)) return;
-  // Bug Fix: Update UI only when metadata is ready
-  progressBar.max = Math.floor(audioPlayer.duration);
-  durationEl.textContent = formatTime(audioPlayer.duration);
-  // Memory Fix: Restore progress only after metadata is loaded
-  const saved =
-    (appState.progressData &&
-      appState.progressData[appState.lastPlayedAudio]) ||
-    0;
-  if (saved > 0 && saved < audioPlayer.duration - 1)
-    audioPlayer.currentTime = saved;
+  // 确保 duration 是有效数字
+  if (isFinite(audioPlayer.duration)) {
+    const duration = Math.floor(audioPlayer.duration);
+    progressBar.max = duration;
+    durationEl.textContent = formatTime(duration);
+
+    // 关键：在这里恢复进度
+    const savedTime =
+      (appState.progressData &&
+        appState.progressData[appState.lastPlayedAudio]) ||
+      0;
+    if (savedTime > 0 && savedTime < duration) {
+      audioPlayer.currentTime = savedTime;
+    }
+  }
 });
 
+// 当播放时间更新时（每秒多次）触发
 audioPlayer.addEventListener("timeupdate", () => {
-  if (!isFinite(audioPlayer.duration)) return;
-  // Bug Fix: Update current time display
-  currentTimeEl.textContent = formatTime(audioPlayer.currentTime);
-  progressBar.value = Math.floor(audioPlayer.currentTime);
-  // Throttle saving progress
+  const currentTime = audioPlayer.currentTime;
+
+  // 无论 duration 是否有效，都应更新当前时间显示
+  if (isFinite(currentTime)) {
+    currentTimeEl.textContent = formatTime(currentTime);
+    progressBar.value = Math.floor(currentTime);
+  }
+
+  // 节流保存播放进度
   if (!progressSaveThrottle || Date.now() - progressSaveThrottle > 2000) {
     progressSaveThrottle = Date.now();
-    if (appState.lastPlayedAudio) {
-      appState.progressData[appState.lastPlayedAudio] = audioPlayer.currentTime;
-      scheduleStateSave(800);
+    // 确保有音频在播放且时间有效才保存
+    if (appState.lastPlayedAudio && isFinite(currentTime) && currentTime > 0) {
+      appState.progressData[appState.lastPlayedAudio] = currentTime;
+      scheduleStateSave(); // 使用默认延迟即可
     }
+  }
+});
+
+// 作为 loadedmetadata 的补充，当 duration 变化时（例如从未知变为已知）再次更新UI
+audioPlayer.addEventListener("durationchange", () => {
+  if (isFinite(audioPlayer.duration)) {
+    const duration = Math.floor(audioPlayer.duration);
+    progressBar.max = duration;
+    durationEl.textContent = formatTime(duration);
   }
 });
 
