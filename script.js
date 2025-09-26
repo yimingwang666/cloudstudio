@@ -296,37 +296,56 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
-/* ----------------- 核心逻辑：加载与恢复 (已优化) ----------------- */
+// --- 🐞 性能优化：快速响应 ---
 function loadAudio(fileName, shouldPlay = true) {
   appState.lastPlayedAudio = fileName;
   audioPlayer.src = `./assets/${fileName}`;
   currentTrackTitle.textContent = fileName;
-  // Bug Fix: Reset UI on new audio load
+
+  // 乐观更新 UI：立即重置时间显示
   progressBar.value = 0;
+  progressBar.max = 1; // 临时最大值，避免进度条不可用
   currentTimeEl.textContent = "00:00";
-  durationEl.textContent = "00:00";
+  durationEl.textContent = "--:--"; // 使用占位符，表示正在加载
+
   refreshActiveMarks();
   audioPlayer.volume = appState.volume ?? 1;
-  if (shouldPlay) audioPlayer.play().catch(() => {});
+
+  // 关键：不再等待 `loadedmetadata`，而是让浏览器自己处理加载和播放
+  if (shouldPlay) {
+    // 调用 play() 会返回一个 Promise，浏览器会在数据足够时自动开始播放
+    const playPromise = audioPlayer.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((error) => {
+        // 自动播放失败通常是因为用户未与页面交互，这是正常行为
+        console.warn("Playback prevented:", error);
+        // 即使播放失败，我们也要确保 UI 状态正确
+        playPauseBtn
+          .querySelector("i")
+          .classList.replace("fa-pause", "fa-play");
+      });
+    }
+  }
+
+  // 尝试立即恢复进度。如果元数据还未加载，浏览器会自动处理
+  const savedTime =
+    (appState.progressData && appState.progressData[fileName]) || 0;
+  if (savedTime > 0) {
+    // 我们可以在 'loadedmetadata' 之前就设置 currentTime。
+    // 浏览器会记住这个值，并在数据加载到该位置后从那里开始。
+    audioPlayer.currentTime = savedTime;
+  }
+
   scheduleStateSave(400);
 }
 
 // 当音频元数据（包括总时长）加载完成时触发
 audioPlayer.addEventListener("loadedmetadata", () => {
-  // 确保 duration 是有效数字
+  // 只需要在这里更新总时长和进度条最大值即可
   if (isFinite(audioPlayer.duration)) {
     const duration = Math.floor(audioPlayer.duration);
     progressBar.max = duration;
     durationEl.textContent = formatTime(duration);
-
-    // 关键：在这里恢复进度
-    const savedTime =
-      (appState.progressData &&
-        appState.progressData[appState.lastPlayedAudio]) ||
-      0;
-    if (savedTime > 0 && savedTime < duration) {
-      audioPlayer.currentTime = savedTime;
-    }
   }
 });
 
