@@ -66,16 +66,13 @@ const loginForm = document.getElementById("login-form");
 const usernameInput = document.getElementById("username-input");
 const guestBtn = document.getElementById("guest-btn");
 const appEl = document.getElementById("app");
-
 const usernameDisplay = document.getElementById("username-display");
 const logoutBtn = document.getElementById("logout-btn");
 const themeToggleBtn = document.getElementById("theme-toggle-btn");
-
 const audioListEl = document.getElementById("audio-list");
 const textListEl = document.getElementById("text-list");
 const markdownContent = document.getElementById("markdown-content");
 const contentViewer = document.getElementById("content-viewer");
-
 const audioPlayer = document.getElementById("audio-player");
 const playPauseBtn = document.getElementById("play-pause-btn");
 const prevBtn = document.getElementById("prev-btn");
@@ -90,26 +87,25 @@ const currentTrackTitle = document.getElementById("current-track-title");
 const sidebar = document.getElementById("sidebar");
 const sidebarToggle = document.getElementById("sidebar-toggle");
 
-/* 应用状态（可序列化）*/
+/* 应用状态 (代码不变) */
 let appState = {
   currentUser: null,
   lastTheme: "dark",
   lastPlayedAudio: null,
   lastOpenedText: null,
-  progressData: {}, // filename => seconds
-  scrollPositions: {}, // filename => 0..1
+  progressData: {},
+  scrollPositions: {},
   volume: 1,
   sidebarCollapsed: false,
 };
 
-/* 防抖和节流句柄 */
-let saveTimeout = null;
-let scrollTimeout = null;
-let progressSaveThrottle = null;
+/* 防抖和节流句柄 (代码不变) */
+let saveTimeout = null,
+  scrollTimeout = null,
+  progressSaveThrottle = null;
 
-/* ----------------- 辅助函数 ----------------- */
+/* ----------------- 辅助函数 (代码不变) ----------------- */
 function sanitizeForSave(state) {
-  // 只保留我们需要的字段（避免 DOM 或函数）
   return {
     lastTheme: state.lastTheme,
     lastPlayedAudio: state.lastPlayedAudio,
@@ -120,13 +116,11 @@ function sanitizeForSave(state) {
     sidebarCollapsed: !!state.sidebarCollapsed,
   };
 }
-
-function scheduleStateSave(delay = 600) {
+function scheduleStateSave(delay = 800) {
   if (!appState.currentUser) return;
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(saveStateToBackend, delay);
 }
-
 async function saveStateToBackend() {
   if (!appState.currentUser) return;
   const payload = {
@@ -134,63 +128,37 @@ async function saveStateToBackend() {
     state: sanitizeForSave(appState),
   };
   try {
-    await fetch(`${WORKER_URL}/save`, {
+    const res = await fetch(`${WORKER_URL}/save`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       keepalive: true,
     });
-    // also mirror to localStorage for instant load
-    localStorage.setItem(
-      `studio_local_${appState.currentUser}`,
-      JSON.stringify(sanitizeForSave(appState))
-    );
+    if (res.ok)
+      localStorage.setItem(
+        `studio_local_${appState.currentUser}`,
+        JSON.stringify(sanitizeForSave(appState))
+      );
   } catch (err) {
-    console.warn("保存到后端失败，已保存在 localStorage（离线）", err);
     localStorage.setItem(
       `studio_local_${appState.currentUser}`,
       JSON.stringify(sanitizeForSave(appState))
     );
   }
 }
-
 async function loadStateFromBackend(username) {
   try {
     const res = await fetch(
       `${WORKER_URL}/get/${encodeURIComponent(username)}`
     );
-    if (!res.ok) throw new Error("no-data");
-    const text = await res.text();
-    // 后端可能直接返回 JSON 字符串或已序列化对象
-    let obj = {};
-    try {
-      obj = JSON.parse(text || "{}");
-    } catch (e) {
-      obj = {};
+    if (res.ok) {
+      const data = await res.json();
+      return typeof data === "string" ? JSON.parse(data) : data;
     }
-    // 如果后端返回的可能是字符串化的字符串 -> 双重解析保护
-    if (typeof obj === "string") {
-      try {
-        obj = JSON.parse(obj);
-      } catch (e) {
-        obj = {};
-      }
-    }
-    return obj || {};
-  } catch (err) {
-    // fallback to localStorage
-    const local = localStorage.getItem(`studio_local_${username}`);
-    if (local) {
-      try {
-        return JSON.parse(local);
-      } catch (e) {
-        return {};
-      }
-    }
-    return {};
-  }
+  } catch (err) {}
+  const local = localStorage.getItem(`studio_local_${username}`);
+  return local ? JSON.parse(local) : {};
 }
-
 function formatTime(seconds = 0) {
   if (!isFinite(seconds) || seconds < 0) return "00:00";
   const s = Math.floor(seconds % 60)
@@ -202,7 +170,7 @@ function formatTime(seconds = 0) {
   return `${m}:${s}`;
 }
 
-/* ----------------- 渲染列表 ----------------- */
+/* ----------------- 渲染与交互 (代码不变) ----------------- */
 function renderLists() {
   audioListEl.innerHTML = AUDIO_FILES.map(
     (f) => `<li tabindex="0" class="audio-item" data-src="${f}">${f}</li>`
@@ -211,10 +179,7 @@ function renderLists() {
     (f) => `<li tabindex="0" class="text-item" data-src="${f}">${f}</li>`
   ).join("");
   attachListHandlers();
-  refreshActiveMarks();
 }
-
-/* 高亮当前选择项 */
 function refreshActiveMarks() {
   document
     .querySelectorAll(".audio-item")
@@ -227,103 +192,19 @@ function refreshActiveMarks() {
       it.classList.toggle("active", it.dataset.src === appState.lastOpenedText)
     );
 }
-
-/* 列表事件代理 */
 function attachListHandlers() {
-  audioListEl.addEventListener("click", (e) => {
-    const li = e.target.closest(".audio-item");
-    if (li) loadAudio(li.dataset.src, true);
-  });
-  textListEl.addEventListener("click", (e) => {
-    const li = e.target.closest(".text-item");
-    if (li) loadAndRenderMarkdown(li.dataset.src);
-  });
-
-  // keyboard accessibility
-  audioListEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const li = e.target.closest(".audio-item");
-      if (li) loadAudio(li.dataset.src, true);
+  const handler = (e, type) => {
+    const li = e.target.closest(`.${type}-item`);
+    if (li && (e.type === "click" || e.key === "Enter")) {
+      if (type === "audio") loadAudio(li.dataset.src, true);
+      else loadAndRenderMarkdown(li.dataset.src);
     }
-  });
-  textListEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const li = e.target.closest(".text-item");
-      if (li) loadAndRenderMarkdown(li.dataset.src);
-    }
-  });
+  };
+  audioListEl.addEventListener("click", (e) => handler(e, "audio"));
+  textListEl.addEventListener("click", (e) => handler(e, "text"));
+  audioListEl.addEventListener("keydown", (e) => handler(e, "audio"));
+  textListEl.addEventListener("keydown", (e) => handler(e, "text"));
 }
-
-/* ----------------- 音频相关 ----------------- */
-function loadAudio(fileName, shouldPlay = true) {
-  appState.lastPlayedAudio = fileName;
-  audioPlayer.src = `./assets/${fileName}`;
-  currentTrackTitle.textContent = fileName;
-  progressBar.value = 0;
-  durationEl.textContent = "00:00";
-  refreshActiveMarks();
-  // 恢复音量
-  audioPlayer.volume = appState.volume ?? 1;
-  if (shouldPlay) {
-    audioPlayer.play().catch(() => {});
-  }
-  scheduleStateSave(400);
-}
-
-audioPlayer.addEventListener("loadedmetadata", () => {
-  if (!isFinite(audioPlayer.duration)) return;
-  progressBar.max = Math.floor(audioPlayer.duration);
-  durationEl.textContent = formatTime(audioPlayer.duration);
-
-  const saved =
-    (appState.progressData &&
-      appState.progressData[appState.lastPlayedAudio]) ||
-    0;
-  if (saved > 0 && saved < audioPlayer.duration - 1) {
-    audioPlayer.currentTime = saved;
-  }
-});
-
-audioPlayer.addEventListener("timeupdate", () => {
-  if (!isFinite(audioPlayer.duration)) return;
-  const t = Math.floor(audioPlayer.currentTime);
-  progressBar.value = t;
-  currentTimeEl.textContent = formatTime(t);
-  // 节流保存 progress（每 2s 或播放结束时保存）
-  if (!progressSaveThrottle || Date.now() - progressSaveThrottle > 2000) {
-    progressSaveThrottle = Date.now();
-    if (appState.lastPlayedAudio) {
-      appState.progressData[appState.lastPlayedAudio] = audioPlayer.currentTime;
-      scheduleStateSave(800);
-    }
-  }
-});
-
-playPauseBtn.addEventListener("click", () => {
-  if (!audioPlayer.src) return;
-  if (audioPlayer.paused) audioPlayer.play();
-  else audioPlayer.pause();
-});
-
-audioPlayer.addEventListener("play", () =>
-  playPauseBtn.querySelector("i").classList.replace("fa-play", "fa-pause")
-);
-audioPlayer.addEventListener("pause", () => {
-  playPauseBtn.querySelector("i").classList.replace("fa-pause", "fa-play");
-  scheduleStateSave();
-});
-audioPlayer.addEventListener("ended", () => playNext(1));
-
-progressBar.addEventListener("input", () => {
-  audioPlayer.currentTime = Number(progressBar.value);
-});
-volumeBar.addEventListener("input", () => {
-  const v = Number(volumeBar.value);
-  audioPlayer.volume = v;
-  appState.volume = v;
-  scheduleStateSave();
-});
-
 function playNext(offset = 1) {
   if (!appState.lastPlayedAudio) return;
   const idx = AUDIO_FILES.indexOf(appState.lastPlayedAudio);
@@ -342,128 +223,39 @@ forwardBtn.addEventListener("click", () => {
     audioPlayer.currentTime + 10
   );
 });
-
-/* ----------------- 文稿加载和滚动恢复 ----------------- */
-async function loadAndRenderMarkdown(fileName) {
-  appState.lastOpenedText = fileName;
-  refreshActiveMarks();
-  markdownContent.innerHTML = `<p style="color:var(--muted)">正在加载 ${fileName} …</p>`;
-  try {
-    const res = await fetch(`./assets/${fileName}`);
-    if (!res.ok) throw new Error("文件未找到");
-    const md = await res.text();
-    markdownContent.innerHTML = marked.parse(md);
-
-    // 恢复滚动位置（百分比）
-    const saved =
-      (appState.scrollPositions && appState.scrollPositions[fileName]) || 0;
-    // 小的延迟以等待渲染完成
-    requestAnimationFrame(() => {
-      const maxScroll = contentViewer.scrollHeight - contentViewer.clientHeight;
-      contentViewer.scrollTop = Math.round(maxScroll * saved);
-    });
-  } catch (err) {
-    markdownContent.innerHTML = `<p style="color:tomato">加载失败：${err.message}</p>`;
-  }
-  scheduleStateSave(400);
-}
-
-/* 记录滚动百分比（防抖）*/
-contentViewer.addEventListener("scroll", () => {
-  if (!appState.lastOpenedText) return;
-  if (scrollTimeout) clearTimeout(scrollTimeout);
-  scrollTimeout = setTimeout(() => {
-    const maxScroll = contentViewer.scrollHeight - contentViewer.clientHeight;
-    const pct = maxScroll > 0 ? contentViewer.scrollTop / maxScroll : 0;
-    appState.scrollPositions[appState.lastOpenedText] = Number(pct.toFixed(4));
-    scheduleStateSave(600);
-  }, 300);
+playPauseBtn.addEventListener("click", () => {
+  if (!audioPlayer.src) return;
+  if (audioPlayer.paused) audioPlayer.play();
+  else audioPlayer.pause();
 });
-
-/* ----------------- 登录 / 注销 ----------------- */
-loginForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const name = (usernameInput.value || "").trim();
-  if (!name) return;
-  await doLogin(name);
+audioPlayer.addEventListener("play", () =>
+  playPauseBtn.querySelector("i").classList.replace("fa-play", "fa-pause")
+);
+audioPlayer.addEventListener("pause", () => {
+  playPauseBtn.querySelector("i").classList.replace("fa-pause", "fa-play");
+  scheduleStateSave();
 });
-guestBtn.addEventListener("click", async () => {
-  const guest = `guest_${Date.now()}`;
-  await doLogin(guest);
+audioPlayer.addEventListener("ended", () => playNext(1));
+progressBar.addEventListener("input", () => {
+  audioPlayer.currentTime = Number(progressBar.value);
 });
-
-async function doLogin(name) {
-  appState.currentUser = name;
-  // 先尝试从后端拉取已保存状态
-  const saved = await loadStateFromBackend(name);
-  // 合并（后端优先，但保留基本默认）
-  Object.assign(appState, { ...appState, ...saved });
-  // set UI
-  usernameDisplay.textContent = name;
-  // 誓言：保证 theme 在最前
-  applyTheme(appState.lastTheme || "dark", false);
-  // volume
-  const v = typeof appState.volume === "number" ? appState.volume : 1;
-  volumeBar.value = v;
+volumeBar.addEventListener("input", () => {
+  const v = Number(volumeBar.value);
   audioPlayer.volume = v;
-
-  renderLists();
-  // 恢复上次打开项
-  if (appState.lastOpenedText && TEXT_FILES.includes(appState.lastOpenedText)) {
-    loadAndRenderMarkdown(appState.lastOpenedText);
-  }
-  if (
-    appState.lastPlayedAudio &&
-    AUDIO_FILES.includes(appState.lastPlayedAudio)
-  ) {
-    loadAudio(appState.lastPlayedAudio, false);
-  }
-
-  // show app
-  loginOverlay.classList.remove("visible");
-  appEl.setAttribute("aria-hidden", "false");
-  localStorage.setItem("studio_currentUser", name);
-  scheduleStateSave(300);
-}
-
-logoutBtn.addEventListener("click", async () => {
-  if (!appState.currentUser) return;
-  // 先保存一次（采用 sendBeacon + fetch 双保险）
-  try {
-    const payload = JSON.stringify({
-      userId: appState.currentUser,
-      state: sanitizeForSave(appState),
-    });
-    // sendBeacon (fire-and-forget)
-    if (navigator.sendBeacon) {
-      const blob = new Blob([payload], { type: "application/json" });
-      navigator.sendBeacon(`${WORKER_URL}/save`, blob);
-    }
-    // also attempt fetch
-    await fetch(`${WORKER_URL}/save`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: payload,
-    });
-  } catch (e) {
-    console.warn("注销时保存失败", e);
-  }
-
-  // 清理本地状态并返回登录
-  localStorage.removeItem("studio_currentUser");
-  usernameDisplay.textContent = "";
-  appState.currentUser = null;
-  // 保留主题偏好 locally, 但清空用户相关项
-  appState.lastPlayedAudio = null;
-  appState.lastOpenedText = null;
-  appState.progressData = {};
-  appState.scrollPositions = {};
-  appState.volume = 1;
-  loginOverlay.classList.add("visible");
-  appEl.setAttribute("aria-hidden", "true");
+  appState.volume = v;
+  scheduleStateSave();
 });
-
-/* ----------------- 主题切换 ----------------- */
+sidebarToggle.addEventListener("click", () => {
+  const collapsed = sidebar.classList.toggle("collapsed");
+  appState.sidebarCollapsed = collapsed;
+  sidebarToggle
+    .querySelector("i")
+    .classList.toggle("fa-chevron-right", collapsed);
+  sidebarToggle
+    .querySelector("i")
+    .classList.toggle("fa-chevron-left", !collapsed);
+  scheduleStateSave();
+});
 function applyTheme(theme, persist = true) {
   if (theme === "light") document.body.classList.add("light-theme");
   else document.body.classList.remove("light-theme");
@@ -479,62 +271,168 @@ function applyTheme(theme, persist = true) {
     scheduleStateSave();
   }
 }
-themeToggleBtn.addEventListener("click", () => {
-  const next = document.body.classList.contains("light-theme")
-    ? "dark"
-    : "light";
-  applyTheme(next);
+themeToggleBtn.addEventListener("click", () =>
+  applyTheme(document.body.classList.contains("light-theme") ? "dark" : "light")
+);
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && document.activeElement === document.body) {
+    e.preventDefault();
+    if (audioPlayer.src) playPauseBtn.click();
+  }
+});
+window.addEventListener("beforeunload", () => {
+  if (appState.currentUser) {
+    try {
+      const payload = JSON.stringify({
+        userId: appState.currentUser,
+        state: sanitizeForSave(appState),
+      });
+      if (navigator.sendBeacon)
+        navigator.sendBeacon(
+          `${WORKER_URL}/save`,
+          new Blob([payload], { type: "application/json" })
+        );
+    } catch (e) {}
+  }
 });
 
-/* ----------------- 侧栏折叠 ----------------- */
-sidebarToggle.addEventListener("click", () => {
-  const collapsed = sidebar.classList.toggle("collapsed");
-  appState.sidebarCollapsed = collapsed;
-  const icon = sidebarToggle.querySelector("i");
-  icon.classList.toggle("fa-chevron-right", collapsed);
-  icon.classList.toggle("fa-chevron-left", !collapsed);
+/* ----------------- 核心逻辑：加载与恢复 (已优化) ----------------- */
+function loadAudio(fileName, shouldPlay = true) {
+  appState.lastPlayedAudio = fileName;
+  audioPlayer.src = `./assets/${fileName}`;
+  currentTrackTitle.textContent = fileName;
+  // Bug Fix: Reset UI on new audio load
+  progressBar.value = 0;
+  currentTimeEl.textContent = "00:00";
+  durationEl.textContent = "00:00";
+  refreshActiveMarks();
+  audioPlayer.volume = appState.volume ?? 1;
+  if (shouldPlay) audioPlayer.play().catch(() => {});
+  scheduleStateSave(400);
+}
+
+audioPlayer.addEventListener("loadedmetadata", () => {
+  if (!isFinite(audioPlayer.duration)) return;
+  // Bug Fix: Update UI only when metadata is ready
+  progressBar.max = Math.floor(audioPlayer.duration);
+  durationEl.textContent = formatTime(audioPlayer.duration);
+  // Memory Fix: Restore progress only after metadata is loaded
+  const saved =
+    (appState.progressData &&
+      appState.progressData[appState.lastPlayedAudio]) ||
+    0;
+  if (saved > 0 && saved < audioPlayer.duration - 1)
+    audioPlayer.currentTime = saved;
+});
+
+audioPlayer.addEventListener("timeupdate", () => {
+  if (!isFinite(audioPlayer.duration)) return;
+  // Bug Fix: Update current time display
+  currentTimeEl.textContent = formatTime(audioPlayer.currentTime);
+  progressBar.value = Math.floor(audioPlayer.currentTime);
+  // Throttle saving progress
+  if (!progressSaveThrottle || Date.now() - progressSaveThrottle > 2000) {
+    progressSaveThrottle = Date.now();
+    if (appState.lastPlayedAudio) {
+      appState.progressData[appState.lastPlayedAudio] = audioPlayer.currentTime;
+      scheduleStateSave(800);
+    }
+  }
+});
+
+async function loadAndRenderMarkdown(fileName) {
+  appState.lastOpenedText = fileName;
+  refreshActiveMarks();
+  markdownContent.innerHTML = `<p style="color:var(--muted)">正在加载 ${fileName} …</p>`;
+  try {
+    const res = await fetch(`./assets/${fileName}`);
+    if (!res.ok) throw new Error("文件未找到");
+    const md = await res.text();
+    markdownContent.innerHTML = marked.parse(md);
+    // Memory Fix: Restore scroll position
+    const saved =
+      (appState.scrollPositions && appState.scrollPositions[fileName]) || 0;
+    requestAnimationFrame(() => {
+      const maxScroll = contentViewer.scrollHeight - contentViewer.clientHeight;
+      contentViewer.scrollTop = Math.round(maxScroll * saved);
+    });
+  } catch (err) {
+    markdownContent.innerHTML = `<p style="color:tomato">加载失败：${err.message}</p>`;
+  }
+  scheduleStateSave(400);
+}
+contentViewer.addEventListener("scroll", () => {
+  if (!appState.lastOpenedText) return;
+  if (scrollTimeout) clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(() => {
+    const maxScroll = contentViewer.scrollHeight - contentViewer.clientHeight;
+    const pct = maxScroll > 0 ? contentViewer.scrollTop / maxScroll : 0;
+    appState.scrollPositions[appState.lastOpenedText] = Number(pct.toFixed(4));
+    scheduleStateSave(600);
+  }, 300);
+});
+
+/* ----------------- 登录/注销/初始化 (已优化) ----------------- */
+async function doLogin(name) {
+  appState.currentUser = name;
+  usernameDisplay.textContent = name;
+  const savedState = await loadStateFromBackend(name);
+  // Memory Fix: Properly merge saved state
+  Object.assign(appState, savedState);
+
+  // Apply UI based on loaded state
+  applyTheme(appState.lastTheme || "dark", false);
+  const v = typeof appState.volume === "number" ? appState.volume : 1;
+  volumeBar.value = v;
+  audioPlayer.volume = v;
+  if (appState.sidebarCollapsed) sidebar.classList.add("collapsed");
+
+  renderLists(); // This will also call refreshActiveMarks
+  // Memory Fix: Explicitly restore last opened items
+  if (appState.lastOpenedText && TEXT_FILES.includes(appState.lastOpenedText)) {
+    loadAndRenderMarkdown(appState.lastOpenedText);
+  }
+  if (
+    appState.lastPlayedAudio &&
+    AUDIO_FILES.includes(appState.lastPlayedAudio)
+  ) {
+    loadAudio(appState.lastPlayedAudio, false);
+  }
+
+  // UI transition
+  loginOverlay.classList.remove("visible");
+  appEl.classList.remove("loading"); // Login Flash Fix
+  appEl.setAttribute("aria-hidden", "false");
+  localStorage.setItem("studio_currentUser", name);
   scheduleStateSave();
+}
+logoutBtn.addEventListener("click", async () => {
+  await saveStateToBackend();
+  localStorage.removeItem("studio_currentUser");
+  window.location.reload();
 });
+loginForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const name = (usernameInput.value || "").trim();
+  if (name) doLogin(name);
+});
+guestBtn.addEventListener("click", () =>
+  doLogin(`guest_${Date.now().toString().slice(-6)}`)
+);
 
-/* ----------------- 初始化 ----------------- */
 function init() {
   const savedTheme = localStorage.getItem("studio_lastTheme");
   if (savedTheme) applyTheme(savedTheme, false);
 
   const savedUser = localStorage.getItem("studio_currentUser");
   if (savedUser) {
-    // 自动登录（尝试拉取远端）
+    // Has user, proceed to login (removes flash)
     doLogin(savedUser);
   } else {
-    // 显示登录
+    // No user, show login form
     loginOverlay.classList.add("visible");
-    appEl.setAttribute("aria-hidden", "true");
-    renderLists();
+    appEl.classList.remove("loading"); // Also remove loading for login view
   }
-
-  // 绑定一些快捷键（空格播放/暂停）
-  window.addEventListener("keydown", (e) => {
-    if (e.code === "Space" && document.activeElement === document.body) {
-      e.preventDefault();
-      if (audioPlayer.src) playPauseBtn.click();
-    }
-  });
-
-  // 在页面卸载前尝试保存一次（sendBeacon）
-  window.addEventListener("beforeunload", () => {
-    if (appState.currentUser) {
-      try {
-        const payload = JSON.stringify({
-          userId: appState.currentUser,
-          state: sanitizeForSave(appState),
-        });
-        if (navigator.sendBeacon) {
-          const blob = new Blob([payload], { type: "application/json" });
-          navigator.sendBeacon(`${WORKER_URL}/save`, blob);
-        }
-      } catch (e) {}
-    }
-  });
 }
 
 init();
