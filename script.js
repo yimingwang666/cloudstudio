@@ -296,30 +296,30 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
-// --- 🐞 性能优化：快速响应 ---
+/* ----------------- 🐞 核心逻辑终极修复区 🐞 ----------------- */
+
 function loadAudio(fileName, shouldPlay = true) {
   appState.lastPlayedAudio = fileName;
   audioPlayer.src = `./assets/${fileName}`;
   currentTrackTitle.textContent = fileName;
 
-  // 乐观更新 UI：立即重置时间显示
+  // 乐观更新 UI
   progressBar.value = 0;
-  progressBar.max = 1; // 临时最大值，避免进度条不可用
+  progressBar.max = 1;
   currentTimeEl.textContent = "00:00";
-  durationEl.textContent = "--:--"; // 使用占位符，表示正在加载
+  durationEl.textContent = "--:--";
 
   refreshActiveMarks();
   audioPlayer.volume = appState.volume ?? 1;
 
-  // 关键：不再等待 `loadedmetadata`，而是让浏览器自己处理加载和播放
+  // 清除上一个文件的轮询定时器
+  if (durationCheckInterval) clearInterval(durationCheckInterval);
+
   if (shouldPlay) {
-    // 调用 play() 会返回一个 Promise，浏览器会在数据足够时自动开始播放
     const playPromise = audioPlayer.play();
     if (playPromise !== undefined) {
       playPromise.catch((error) => {
-        // 自动播放失败通常是因为用户未与页面交互，这是正常行为
         console.warn("Playback prevented:", error);
-        // 即使播放失败，我们也要确保 UI 状态正确
         playPauseBtn
           .querySelector("i")
           .classList.replace("fa-pause", "fa-play");
@@ -327,45 +327,63 @@ function loadAudio(fileName, shouldPlay = true) {
     }
   }
 
-  // 尝试立即恢复进度。如果元数据还未加载，浏览器会自动处理
+  // 立即尝试恢复进度
   const savedTime =
     (appState.progressData && appState.progressData[fileName]) || 0;
   if (savedTime > 0) {
-    // 我们可以在 'loadedmetadata' 之前就设置 currentTime。
-    // 浏览器会记住这个值，并在数据加载到该位置后从那里开始。
     audioPlayer.currentTime = savedTime;
   }
 
   scheduleStateSave(400);
 }
 
-// 当音频元数据（包括总时长）加载完成时触发
-audioPlayer.addEventListener("loadedmetadata", () => {
-  // 只需要在这里更新总时长和进度条最大值即可
-  if (isFinite(audioPlayer.duration)) {
-    const duration = Math.floor(audioPlayer.duration);
-    progressBar.max = duration;
-    durationEl.textContent = formatTime(duration);
-  }
+// 当播放开始时（无论元数据是否加载），启动我们的主动轮询检查
+audioPlayer.addEventListener("playing", () => {
+  // 清除旧的定时器以防万一
+  if (durationCheckInterval) clearInterval(durationCheckInterval);
+
+  // 启动一个新的定时器，每 250 毫秒检查一次总时长
+  durationCheckInterval = setInterval(() => {
+    // 检查 audioPlayer.duration 是否已经是一个有效的、大于0的数字
+    if (isFinite(audioPlayer.duration) && audioPlayer.duration > 0) {
+      // 成功获取！
+      const duration = Math.floor(audioPlayer.duration);
+      progressBar.max = duration;
+      durationEl.textContent = formatTime(duration);
+
+      // 任务完成，清除定时器，避免不必要的资源消耗
+      clearInterval(durationCheckInterval);
+      durationCheckInterval = null;
+    }
+  }, 250); // 每秒检查4次
+});
+
+// 当音频暂停、结束或出错时，停止轮询
+audioPlayer.addEventListener("pause", () => {
+  if (durationCheckInterval) clearInterval(durationCheckInterval);
+});
+audioPlayer.addEventListener("ended", () => {
+  if (durationCheckInterval) clearInterval(durationCheckInterval);
+});
+audioPlayer.addEventListener("error", () => {
+  if (durationCheckInterval) clearInterval(durationCheckInterval);
 });
 
 // 当播放时间更新时（每秒多次）触发
 audioPlayer.addEventListener("timeupdate", () => {
   const currentTime = audioPlayer.currentTime;
 
-  // 无论 duration 是否有效，都应更新当前时间显示
   if (isFinite(currentTime)) {
     currentTimeEl.textContent = formatTime(currentTime);
     progressBar.value = Math.floor(currentTime);
   }
 
-  // 节流保存播放进度
+  // 节流保存播放进度 (这段逻辑是正确的，保持不变)
   if (!progressSaveThrottle || Date.now() - progressSaveThrottle > 2000) {
     progressSaveThrottle = Date.now();
-    // 确保有音频在播放且时间有效才保存
     if (appState.lastPlayedAudio && isFinite(currentTime) && currentTime > 0) {
       appState.progressData[appState.lastPlayedAudio] = currentTime;
-      scheduleStateSave(); // 使用默认延迟即可
+      scheduleStateSave();
     }
   }
 });
